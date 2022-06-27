@@ -3,3 +3,5 @@ node-teacher
 .env
 package-lock.json
 /data/header01.txt
+/public/fontawesome
+/public/imgs

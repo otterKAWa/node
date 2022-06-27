@@ -3,18 +3,73 @@ require("dotenv").config();
 const express = require("express");
 const app = express();
 const multer = require("multer");
-const upload = multer({dest: "tmp-uploads"});
+const { propfind } = require("./routes/admins");
+// const upload = multer({dest: "tmp-uploads"});
+const upload = require(__dirname + "/modules/upload-images");
+const session = require("express-session");
 
 
 app.set("view engine", "ejs")
+app.set("case sensitive routing", true); //url區分大小寫
+
+app.use(session ({
+    saveUninitialized: false,
+    resave: false,
+    secret: 'fkhdkflfs43f5d4s3f5ds',
+    cookie: {
+        maxAge: 1200000, //20分鐘，單位毫秒
+    }
+}));
+
 
 // Top-level middlewares
 app.use(express.urlencoded({extended: false}));
 app.use(express.json());
+app.use((req, res, next) => {
+    res.locals.Hello = "哈囉ㄅ";
+    next();
+});
 
 app.get('/try-qs', (req, res)=>{
     res.json(req.query);
 });
+
+
+app.get('/try-params1/:action/:id', (req, res)=>{
+    res.json({code:2, params: req.params});
+});
+
+app.get('/try-params1/:action', (req, res)=>{
+    res.json({code:2, params: req.params});
+});
+
+app.get('/try-params1/:action?/:id?', (req, res)=>{
+    res.json({code:2, params: req.params});
+});
+
+app.get(/^\/hi\/?/i, (req, res) => {
+    res.send({url: req.url});
+});
+
+app.get(["/aaa", "/bbb"], (req, res) => {
+    res.send({url: req.url, code:"array"});
+});
+
+app.get("/try-session", (req, res) => {
+    req.session.my_var = req.session.my_var || 0 ;
+    req.session.my_var++;
+    res.json({
+        my_var: req.session.my_var,
+        session: req.session
+    });
+});
+
+
+// app.use('/admins', require(__dirname + '/routes/admins'));
+const adminsRouter = require(__dirname + '/routes/admins');
+// prefix 前綴路徑
+app.use("/admins", adminsRouter);
+app.use(adminsRouter);
 
 // middleware: 中介軟體 (function)
 // const bodyParser = express.urlencoded({extended: false});
@@ -32,6 +87,13 @@ app.route('/try-post-form')
         res.render('try-post-form', {email, password});
     });
 
+app.post('/try-upload', upload.single('avatar'), (req, res)=>{
+    res.json(req.file);
+});
+
+app.post('/try-uploads', upload.array('photos'), (req, res)=>{
+    res.json(req.files);
+});
 
 
 app.use(express.static("public"));
