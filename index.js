@@ -7,6 +7,12 @@ const { propfind } = require("./routes/admins");
 // const upload = multer({dest: "tmp-uploads"});
 const upload = require(__dirname + "/modules/upload-images");
 const session = require("express-session");
+const moment = require("moment-timezone");
+
+const db = require(__dirname + "/modules/mysql-connect");
+const MysqlStore = require("express-mysql-session")(session);
+const sessionStore = new MysqlStore({}, db);  //跟資料庫的sessions有關，沒代到21行就沒東西
+
 
 
 app.set("view engine", "ejs")
@@ -16,11 +22,11 @@ app.use(session ({
     saveUninitialized: false,
     resave: false,
     secret: 'fkhdkflfs43f5d4s3f5ds',
+    store: sessionStore,
     cookie: {
-        maxAge: 1200000, //20分鐘，單位毫秒
+        maxAge: 1800000, //20分鐘，單位毫秒
     }
 }));
-
 
 // Top-level middlewares
 app.use(express.urlencoded({extended: false}));
@@ -33,7 +39,6 @@ app.use((req, res, next) => {
 app.get('/try-qs', (req, res)=>{
     res.json(req.query);
 });
-
 
 app.get('/try-params1/:action/:id', (req, res)=>{
     res.json({code:2, params: req.params});
@@ -63,6 +68,29 @@ app.get("/try-session", (req, res) => {
         session: req.session
     });
 });
+
+app.get('/try-json', (req, res)=>{
+    const data = require(__dirname + "/data/data01");
+    console.log(data);
+    // res.json(data);
+    res.locals.rows = data;
+    res.render("try-json");
+});
+
+app.get('/try-moment', (req, res)=>{
+    const fm = "YYYY-MM-DD HH:mm:ss";
+    const m1 = moment();
+    const m2 = moment("2022-02-28");
+
+    res.json({
+        m1: m1.format(fm),
+        m1a: m1.tz("Europe/London").format(fm),
+        m2: m1.format(fm),
+        m2a: m1.tz("Europe/London").format(fm),
+    })
+});
+
+
 
 
 // app.use('/admins', require(__dirname + '/routes/admins'));
