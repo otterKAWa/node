@@ -9,6 +9,14 @@ const upload = require(__dirname + "/modules/upload-images");
 const session = require("express-session");
 const moment = require("moment-timezone");
 
+
+
+const {
+    toDateString,
+    toDatetimeString,
+} = require(__dirname + '/modules/date-tools');
+
+
 const db = require(__dirname + "/modules/mysql-connect");
 const MysqlStore = require("express-mysql-session")(session);
 const sessionStore = new MysqlStore({}, db);  //跟資料庫的sessions有關，沒代到21行就沒東西
@@ -32,7 +40,9 @@ app.use(session ({
 app.use(express.urlencoded({extended: false}));
 app.use(express.json());
 app.use((req, res, next) => {
-    res.locals.Hello = "哈囉ㄅ";
+    // res.locals.Hello = "哈囉ㄅ";
+    res.locals.toDateString = toDateString;
+    res.locals.toDatetimeString = toDatetimeString;
     next();
 });
 
@@ -68,6 +78,13 @@ app.get("/try-session", (req, res) => {
         session: req.session
     });
 });
+
+app.use('/address-book', require(__dirname + '/routes/address-book'));
+
+
+
+
+
 
 app.get('/try-json', (req, res)=>{
     const data = require(__dirname + "/data/data01");
