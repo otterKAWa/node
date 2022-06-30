@@ -8,6 +8,7 @@ const { propfind } = require("./routes/admins");
 const upload = require(__dirname + "/modules/upload-images");
 const session = require("express-session");
 const moment = require("moment-timezone");
+const { default: axios } = require("axios");
 
 
 
@@ -81,7 +82,13 @@ app.get("/try-session", (req, res) => {
 
 app.use('/address-book', require(__dirname + '/routes/address-book'));
 
-
+app.get("/yahoo", async (req, res)=>{
+    axios.get("https://tw.yahoo.com/")
+    .then(function (response) {
+        console.log(response);
+        res.send(response.data);
+    })
+})
 
 
 
