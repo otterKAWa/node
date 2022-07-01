@@ -5,8 +5,8 @@ const {
     toDatetimeString,
 } = require(__dirname + '/../modules/date-tools');
 const moment = require('moment-timezone');
-const Joi = require("joi");
-const upload = require(__dirname + "/../modules/upload-images");
+const Joi = require('joi');
+const upload = require(__dirname + '/../modules/upload-images')
 
 const router = express.Router(); // 建立 router 物件
 
@@ -30,6 +30,7 @@ const getListHandler = async (req, res)=>{
     if(search){
         where += ` AND name LIKE ${ db.escape('%'+search+'%') } `;
         output.query.search = search;
+        
     }
     if(beginDate){
         const mo = moment(beginDate);
@@ -76,17 +77,31 @@ const getListHandler = async (req, res)=>{
     return output;
 };
 
-router.get('/add', async (req, res)=>{
-    res.render("address_book/add");
+router.use((req, res, next)=>{
+    /*
+    if(! req.session.admin){
+        return res.redirect('/');
+    }
+    */
+    next();
 });
 
+router.get('/add', async (req, res)=>{
+    if(! req.session.admin){
+        return res.redirect('/');
+    }
+    res.render('address-book/add');
+});
 
-router.post('/add',upload.none(),async (req, res)=>{
+router.post('/add', upload.none(), async (req, res)=>{
+    if(! req.session.admin){
+        return res.json({success: false, error: '請先登入'});
+    }
     const schema = Joi.object({
         name: Joi.string()
-        .min(3)
-        .required()
-        .label("姓名必填"),
+            .min(3)
+            .required()
+            .label('姓名必填'),
         email: Joi.string()
             .email()
             .required(),
@@ -95,20 +110,27 @@ router.post('/add',upload.none(),async (req, res)=>{
         address: Joi.string(),
     });
 
-
     // 自訂訊息
     // https://stackoverflow.com/questions/48720942/node-js-joi-how-to-display-a-custom-error-messages
 
     console.log( schema.validate(req.body, {abortEarly: false}) );
+    /*
     const sql = "INSERT INTO `address_book`(`name`, `email`, `mobile`, `birthday`, `address`, `created_at`) VALUES (?, ?, ?, ?, ?, NOW())";
     const {name, email, mobile, birthday, address} = req.body;
     const [result] = await db.query(sql, [name, email, mobile, birthday, address]);
+
     // {"fieldCount":0,"affectedRows":1,"insertId":1113,"info":"","serverStatus":2,"warningStatus":0}
-    
     res.json(result);
+    */
+    const sql = "INSERT INTO `address_book` SET ?";
+    const birthday = req.body.birthday || null;
+    const insertData = {...req.body, birthday, created_at: new Date()};
+    const [result] = await db.query(sql, [insertData]);
+
+    // {"fieldCount":0,"affectedRows":1,"insertId":1113,"info":"","serverStatus":2,"warningStatus":0}
+    res.json(result);
+
 });
-
-
 
 router.get('/', async (req, res)=>{
     const output = await getListHandler(req, res);
@@ -120,7 +142,12 @@ router.get('/', async (req, res)=>{
             return res.redirect(`?page=${output.totalPages}`);
             break;
     }
-    res.render('address_book/main', output);
+    if(! req.session.admin){
+        res.render('address-book/main-noadmin', output);
+    } else {
+        res.render('address-book/main', output);
+    }
+    
 });
 router.get('/api', async (req, res)=>{
     const output = await getListHandler(req, res);

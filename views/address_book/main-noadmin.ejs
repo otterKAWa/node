@@ -1,26 +1,7 @@
 <%- include('../parts/html-head') %> <%- include('../parts/navbar') %>
 
 <div class="container">
-    <div class="row">
-        <div class="col">
-            <form class="d-flex">
-                <input class="form-control" type="date" name="beginDate" 
-                value="<%= query.beginDate ? query.beginDate : '' %>" >
-                <input class="form-control" type="date" name="endDate" 
-                value="<%= query.endDate ? query.endDate : '' %>" >
-                <input
-                    class="form-control me-2"
-                    type="search"
-                    placeholder="Search"
-                    name="search"
-                    value="<%= query.search ? query.search : '' %>"
-                />
-                <button class="btn btn-outline-success" type="submit">
-                    Search
-                </button>
-            </form>
-        </div>
-    </div>
+
     <div class="row">
         <div class="col">
             <nav aria-label="Page navigation example">
@@ -64,10 +45,7 @@
                     <tr>
                         <th scope="col">#</th>
                         <th scope="col">Name</th>
-                        <th scope="col">Email</th>
-                        <th scope="col">Mobile</th>
-                        <th scope="col">Birthday</th>
-                        <th scope="col">Address</th>
+
                     </tr>
                 </thead>
                 <tbody>
@@ -75,10 +53,7 @@
                     <tr>
                         <td><%= i.sid %></td>
                         <td><%= i.name %></td>
-                        <td><%= i.email %></td>
-                        <td><%= i.mobile %></td>
-                        <td><%= toDateString(i.birthday) %></td>
-                        <td><%= i.address %></td>
+
                     </tr>
                     <% } %>
                 </tbody>

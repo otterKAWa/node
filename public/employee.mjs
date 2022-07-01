@@ -1,4 +1,4 @@
-const Person = require("./person");
+import Person from "./person.mjs";
 
 class Employee extends Person {
     constructor(name = "", age = 20, employee_id = "") {
@@ -12,4 +12,4 @@ class Employee extends Person {
     }
 }
 
-module.exports = Employee;
+export default Employee;

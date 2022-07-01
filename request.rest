@@ -1,16 +1,15 @@
+
+
 POST http://localhost:3600/try-post
 Content-Type: application/x-www-form-urlencoded
 
-name=HAHAHA&age=87
-
+name=David&age=30
 
 ###
 POST http://localhost:3600/try-post
 Content-Type: application/json
 
 {
-    "name": "鮭魚",
+    "name": "Flora",
     "age": 30
 }
-
-# 最後一ㄍ不要逗點

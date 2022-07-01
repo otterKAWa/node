@@ -1,136 +1,199 @@
-const express = require('express');
-const db = require(__dirname + '/../modules/mysql-connect');
+require("dotenv").config();
+const express = require("express");
+const multer = require('multer');
+// const upload = multer({dest: 'tmp-uploads'});
+const upload = require(__dirname + '/modules/upload-images');
+const session = require('express-session');
+const moment = require('moment-timezone');
+const axios = require('axios');
+const bcrypt = require('bcryptjs');
+
 const {
     toDateString,
     toDatetimeString,
-} = require(__dirname + '/../modules/date-tools');
-const moment = require('moment-timezone');
-const Joi = require('joi');
-const upload = require(__dirname + '/../modules/upload-images')
+} = require(__dirname + '/modules/date-tools');
 
-const router = express.Router(); // 建立 router 物件
+const db = require(__dirname + '/modules/mysql-connect');
+const MysqlStore = require('express-mysql-session')(session);
+const sessionStore = new MysqlStore({}, db);
 
-const getListHandler = async (req, res)=>{
-    let output = {
-        perPage: 10,
-        page: 1,
-        totalRows: 0,
-        totalPages: 0,
-        code: 0,  // 辨識狀態
-        error: '',
-        query: {},
-        rows: []
-    };
-    let page = +req.query.page || 1;
+const app = express();
 
-    let search = req.query.search || '';
-    let beginDate = req.query.beginDate || '';
-    let endDate = req.query.endDate || '';
-    let where = ' WHERE 1 ';
-    if(search){
-        where += ` AND name LIKE ${ db.escape('%'+search+'%') } `;
-        output.query.search = search;
-        
+app.set("view engine", "ejs");
+app.set('case sensitive routing', true);
+
+// Top-level middlewares
+app.use(session({
+    saveUninitialized: false,
+    resave: false,
+    secret: 'dkfdl85493igdfigj9457394573irherer',
+    store: sessionStore,
+    cookie: {
+        maxAge: 1800000, // 30 min
     }
-    if(beginDate){
-        const mo = moment(beginDate);
-        if(mo.isValid()){
-            where += ` AND birthday >= '${mo.format('YYYY-MM-DD')}' `;
-            output.query.beginDate = mo.format('YYYY-MM-DD');
-        }
-    }
-    if(endDate){
-        const mo = moment(endDate);
-        if(mo.isValid()){
-            where += ` AND birthday <= '${mo.format('YYYY-MM-DD')}' `;
-            output.query.endDate = mo.format('YYYY-MM-DD');
-        }
-    }
-    output.showTest = where;
+}));
+app.use(express.urlencoded({extended: false}));
+app.use(express.json());
+app.use((req, res, next)=>{
+    // res.locals.shinder = '哈囉';
 
-    if(page<1) {
-        output.code = 410;
-        output.error = '頁碼太小';
-        return output;
-    }
+    // template helper functions
+    res.locals.toDateString = toDateString;
+    res.locals.toDatetimeString = toDatetimeString;
+    res.locals.session = req.session;
 
-    const sql01 = `SELECT COUNT(1) totalRows FROM address_book ${where} `;
-    const [[{totalRows}]] = await db.query(sql01);
-    let totalPages = 0;
-    if(totalRows) {
-        totalPages = Math.ceil(totalRows/output.perPage);
-        if(page>totalPages){
-            output.totalPages = totalPages;
-            output.code = 420;
-            output.error = '頁碼太大';
-            return output;
-        }
-
-        const sql02 = `SELECT * FROM address_book ${where} ORDER BY sid DESC LIMIT ${(page-1)*output.perPage}, ${output.perPage}`;
-        const [r2] = await db.query(sql02);
-        r2.forEach(el=> el.birthday = toDateString(el.birthday) );
-        output.rows = r2;
-    }
-    output.code = 200;
-    output = {...output, page, totalRows, totalPages};
-
-    return output;
-};
-router.get('/add', async (req, res)=>{
-    res.render('address-book/add');
+    next();
 });
 
-router.post('/add', upload.none(), async (req, res)=>{
-    const schema = Joi.object({
-        name: Joi.string()
-            .min(3)
-            .required()
-            .label('姓名必填'),
-        email: Joi.string()
-            .email()
-            .required(),
-        mobile: Joi.string(),
-        birthday: Joi.any(),
-        address: Joi.string(),
+app.get('/try-qs', (req, res)=>{
+    res.json(req.query);
+});
+
+// middleware: 中介軟體 (function)
+// const bodyParser = express.urlencoded({extended: false});
+app.post('/try-post', (req, res)=>{
+    res.json(req.body);
+});
+
+app.route('/try-post-form')
+    .get((req, res)=>{
+        res.render('try-post-form');
+    })
+    .post((req, res)=>{
+        const {email, password} = req.body;
+        res.render('try-post-form', {email, password});
     });
 
-    // 自訂訊息
-    // https://stackoverflow.com/questions/48720942/node-js-joi-how-to-display-a-custom-error-messages
-
-    console.log( schema.validate(req.body, {abortEarly: false}) );
-    /*
-    const sql = "INSERT INTO `address_book`(`name`, `email`, `mobile`, `birthday`, `address`, `created_at`) VALUES (?, ?, ?, ?, ?, NOW())";
-    const {name, email, mobile, birthday, address} = req.body;
-    const [result] = await db.query(sql, [name, email, mobile, birthday, address]);
-
-    // {"fieldCount":0,"affectedRows":1,"insertId":1113,"info":"","serverStatus":2,"warningStatus":0}
-    res.json(result);
-    */
-    const sql = "INSERT INTO `address_book` SET ?";
-    const birthday = req.body.birthday || null;
-    const insertData = {...req.body, birthday, created_at: new Date()};
-    const [result] = await db.query(sql, [insertData]);
-
-    // {"fieldCount":0,"affectedRows":1,"insertId":1113,"info":"","serverStatus":2,"warningStatus":0}
-    res.json(result);
-
+app.post('/try-upload', upload.single('avatar'), (req, res)=>{
+    res.json(req.file);
 });
 
-router.get('/', async (req, res)=>{
-    const output = await getListHandler(req, res);
-    switch(output.code){
-        case 410:
-            return res.redirect(`?page=1`);
-            break;
-        case 420:
-            return res.redirect(`?page=${output.totalPages}`);
-            break;
-    }
-    res.render('address-book/main', output);
-});
-router.get('/api', async (req, res)=>{
-    const output = await getListHandler(req, res);
-    res.json(output);
+app.post('/try-uploads', upload.array('photos'), (req, res)=>{
+    res.json(req.files);
 });
 
-module.exports = router;
+
+app.get('/try-params1/:action/:id', (req, res)=>{
+    res.json({code:2, params: req.params});
+})
+app.get('/try-params1/:action', (req, res)=>{
+    res.json({code:3, params: req.params});
+})
+app.get('/try-params1/:action?/:id?', (req, res)=>{
+    res.json({code:1, params: req.params});
+});
+
+app.get(/^\/hi\/?/i, (req, res)=>{
+    res.send({url: req.url});
+});
+app.get(['/aaa', '/bbb'], (req, res)=>{
+    res.send({url: req.url, code:'array'});
+});
+
+app.get('/try-json', (req, res)=>{
+    const data = require(__dirname + '/data/data01');
+    console.log(data);
+    res.locals.rows = data;
+    res.render('try-json');
+});
+
+app.get('/try-moment', (req, res)=>{
+    const fm = 'YYYY-MM-DD HH:mm:ss';
+    const m1 = moment();
+    const m2 = moment('2022-02-28');
+
+    res.json({
+        m1: m1.format(fm),
+        m1a: m1.tz('Europe/London').format(fm),
+        m2: m2.format(fm),
+        m2a: m2.tz('Europe/London').format(fm),
+    })
+});
+
+const adminsRouter = require(__dirname + '/routes/admins');
+// prefix 前綴路徑
+app.use('/admins', adminsRouter);
+app.use(adminsRouter);
+
+app.get('/try-session', (req, res)=>{
+    req.session.my_var = req.session.my_var || 0;
+    req.session.my_var++;
+    res.json({
+        my_var: req.session.my_var,
+        session: req.session,
+    });
+})
+
+app.use('/address-book', require(__dirname + '/routes/address-book'));
+
+app.get('/yahoo', async (req, res)=>{
+    axios.get('https://tw.yahoo.com/')
+    .then(function (response) {
+      // handle success
+        console.log(response);
+        res.send(response.data);
+    })
+});
+app.route('/login')
+    .get(async (req, res)=>{
+        res.render('login');
+    })
+    .post(async (req, res)=>{
+        const output = {
+            success: false,
+            error: '',
+            code: 0,
+        };
+        const sql = "SELECT * FROM admins WHERE account=?";
+        const [r1] = await db.query(sql, [req.body.account]);
+
+        if(! r1.length){
+            // 帳號錯誤
+            output.code = 401;
+            output.error = '帳密錯誤'
+            return res.json(output)
+        }
+        //const row = r1[0];
+
+        output.success = await bcrypt.compare(req.body.password, r1[0].pass_hash);
+        if(! output.success){
+            // 密碼錯誤
+            output.code = 402;
+            output.error = '帳密錯誤'
+        } else {
+            req.session.admin = {
+                sid: r1[0].sid,
+                account: r1[0].account,
+            };
+        }
+
+        res.json(output);
+    });
+
+
+app.get("/logout", (req, res) => {
+    delete req.session.admin;
+    res.redirect("/");
+});
+
+    
+app.get("/", (req, res) => {
+    res.render("main", { name: "Shinder" });
+});
+
+// ------- static folder -----------
+app.use(express.static("public"));
+app.use("/bootstrap", express.static("node_modules/bootstrap/dist"));
+app.use("/joi", express.static("node_modules/joi/dist"));
+
+// ------- 404 -----------
+app.use((req, res) => {
+    res.send(`<h2>找不到頁面 404</h2>
+    <img src="/imgs/6c0519f6e0e0d42e458daef829c74ae4.jpg" alt="" width="300px" />
+    `);
+});
+
+app.listen(process.env.PORT, () => {
+    console.log(`server started: ${process.env.PORT}`);
+    console.log({ NODE_ENV: process.env.NODE_ENV });
+});
